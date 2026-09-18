@@ -1,0 +1,5 @@
+# dsh-restart bundle 层:一个宿主插件行(客户端半由 package.json 的 dsh.client 声明注入)。
+# 安装: dsh plugin --profile web add github:DWJZ/dsh-restart
+- insert:
+    - id: dsh-restart
+      name: dsh-restart

@@ -1,0 +1,56 @@
+{
+  "name": "dsh-restart",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness 重启按钮插件:在设置的「重启」页一键重启 dsh Web 宿主进程。 / One-click host restart from a page in Settings.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DWJZ/dsh-restart.git"
+  },
+  "homepage": "https://github.com/DWJZ/dsh-restart#readme",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh-plugin",
+    "restart"
+  ],
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./client/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "client",
+    "test",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    }
+  }
+}
