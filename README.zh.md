@@ -24,12 +24,14 @@ description: "dsh-restart: 在 dsh Web 设置面板里一键重启宿主进程�
 ## 安装
 
 ```sh
-# GitHub 源
+# from GitHub
 dsh plugin --profile web add github:DWJZ/dsh-restart
 
-# 本地开发(profile 直接软链检出目录,改完即生效)
+# local development (the profile links the checkout, so edits apply directly)
 dsh plugin --profile web add link:/path/to/dsh-restart
 ```
+
+上面两条命令分别是:从 GitHub 源安装,以及本地开发时软链检出目录(`link:`),后者改完代码即生效。
 
 首次安装后需要重启一次(在终端重启宿主,或临时用一次 dshmarket 的重启按钮),这个页面才会出现;之后就都用它来重启。
 
