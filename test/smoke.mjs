@@ -104,6 +104,52 @@ if (found === null) {
   check('client renders the section', html.includes('dshr_card'))
 }
 
+console.log('stop route')
+const routes = new Map()
+host.apply({
+  inject: (names, factory) => factory({
+    effect: (fn) => { fn(); return () => {} },
+    webServer: { register: (route) => { routes.set(route.path, route.handler); return () => {} } },
+  }),
+})
+check('the stop route is registered', typeof routes.get('/dsh-restart/stop') === 'function')
+check('the restart route is still registered', typeof routes.get('/dsh-restart/restart') === 'function')
+
+const call = (handler, overrides = {}) => {
+  const answer = { status: 0, body: '' }
+  const res = {
+    writeHead: (code) => { answer.status = code },
+    setHeader: () => {},
+    write: (chunk) => { answer.body += String(chunk) },
+    end: (chunk) => { if (chunk !== undefined) answer.body += String(chunk) },
+  }
+  handler({
+    method: 'POST',
+    headers: { host: '127.0.0.1:3080', origin: 'http://127.0.0.1:3080' },
+    socket: { remoteAddress: '127.0.0.1' },
+    ...overrides,
+  }, res)
+  return answer
+}
+
+check('a GET is refused', call(routes.get('/dsh-restart/stop'), { method: 'GET' }).status === 405)
+check('a foreign origin is refused',
+  call(routes.get('/dsh-restart/stop'), { headers: { host: '127.0.0.1:3080', origin: 'http://evil.test' } }).status === 403)
+check('a forwarded peer is refused',
+  call(routes.get('/dsh-restart/stop'), { headers: { host: '127.0.0.1:3080', origin: 'http://127.0.0.1:3080', 'x-forwarded-for': '10.0.0.1' } }).status === 403)
+
+// The happy path ends this very process, so the signal is captured instead: the
+// handler reads `process.kill` when it fires, which keeps the seam injectable.
+const signals = []
+const realKill = process.kill
+process.kill = (pid, signal) => { signals.push([pid, signal]); return true }
+const accepted = call(routes.get('/dsh-restart/stop'))
+await new Promise((resolve) => { setTimeout(resolve, 600) })
+process.kill = realKill
+check('a same-origin POST answers 202 before stopping', accepted.status === 202, String(accepted.status))
+check('and asks for a graceful SIGTERM, never SIGKILL',
+  signals.length === 1 && signals[0][0] === process.pid && signals[0][1] === 'SIGTERM', JSON.stringify(signals))
+
 console.log(failures === 0 ? '\nPASS' : `\n${String(failures)} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)
 

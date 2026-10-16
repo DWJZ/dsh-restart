@@ -12,12 +12,15 @@ A **Restart** page in the DeepSeek Harness (dsh) Web settings panel: one button 
 
 ## What it does
 
-- **Host half** registers two routes on the Web server, both limited to direct same-origin loopback requests:
+- **Host half** registers three routes on the Web server, all limited to direct same-origin loopback requests:
   - `GET /dsh-restart/status` — boot id, PID, start time, and serving port of the current process
   - `POST /dsh-restart/restart` — replaces the current process (the host exits after answering `202`)
-- **Browser half** registers a `settings.section` page showing that identity plus a restart button. It polls `/dsh-restart/status` after the click and reloads the page as soon as a different boot id answers.
+  - `POST /dsh-restart/stop` — ends the current process and starts nothing (same ordering)
+- **Browser half** registers a `settings.section` page showing that identity, a restart button, and a stop button. After a restart it polls `/dsh-restart/status` and reloads the page as soon as a different boot id answers; after a stop there is nothing to wait for, so the page reports success once the status route stops answering — and says plainly that starting again means running the launch command in a terminal.
 
 The restart itself is done by a detached helper: the host exits after 400 ms, and the helper waits until the port stops accepting connections before spawning the replacement with **exactly the same launch invocation** (Node binary, `execArgv`, absolute entry path, remaining argv, working directory). That ordering is what keeps the replacement from dying of `EADDRINUSE` while the old socket is still held. Logs land in the system temp directory as `dsh-restart-<timestamp>.out.log` / `.err.log`.
+
+A stop is the same 400 ms `SIGTERM` with no helper behind it, which is what lets the CLI flush sessions and dispose plugins before its own escalation timer forces the exit. Because a stopped host has no replacement, the process you restart from the page is also the one no longer attached to your terminal — after any restart, stopping it means this button, `kill <pid>`, or `curl -X POST http://127.0.0.1:<port>/dsh-restart/stop`.
 
 Sessions live on disk and survive the restart, and plugins that are installed but not active yet load on the next boot.
 
@@ -36,6 +39,8 @@ The first install needs one restart before the page exists — restart the host 
 ## Endpoint contract
 
 `POST /dsh-restart/restart` accepts only requests whose peer is loopback and whose `Origin` matches `Host`; any forwarding header (`Forwarded`, `X-Forwarded-For`, `X-Real-IP`) or non-loopback peer is refused with `403`. It answers `202`, then the host exits and the helper starts the replacement.
+
+`POST /dsh-restart/stop` takes the same guard and answers `202` before exiting, so the browser learns the outcome from the response instead of from a dropped connection. It never sends `SIGKILL`: the graceful signal is what flushes sessions.
 
 ## Test
 

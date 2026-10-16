@@ -193,6 +193,20 @@ export function helperSource(launch, logOut, logErr, port) {
 }
 
 /**
+ * End this process with the signal its bounded shutdown handles.
+ *
+ * `SIGTERM` is what lets the CLI flush sessions and dispose plugins before its
+ * escalation timer forces the exit; `SIGKILL` would skip all of it.
+ * @param options - injectable collaborators for tests.
+ * @param options.kill - the kill implementation; defaults to `process.kill`.
+ * @param options.timer - the scheduler; defaults to `setTimeout`.
+ * @returns nothing; the signal is sent after the delay.
+ */
+export function stopProcess({ kill = process.kill, timer = setTimeout } = {}) {
+  timer(() => { kill(process.pid, 'SIGTERM') }, 400)
+}
+
+/**
  * Start the detached helper, then stop this process so the helper's
  * replacement can take the port.
  * @param port - the port the replacement must bind; null when unknown.
@@ -214,7 +228,7 @@ function scheduleRestart(port) {
   catch {
     // A missing log file only costs the postmortem; the restart itself proceeds.
   }
-  setTimeout(() => { process.kill(process.pid, 'SIGTERM') }, 400)
+  stopProcess()
   return { pid: process.pid, helperPid: helper.pid, logOut, logErr }
 }
 
@@ -269,6 +283,29 @@ function restartHandler(req, res) {
 }
 
 /**
+ * Answer `/dsh-restart/stop` by ending this process and leaving nothing behind.
+ *
+ * The answer goes out first: once this process is gone the page has nothing left
+ * to talk to, so the browser learns the outcome from the 202 rather than from a
+ * dropped connection.
+ * @param req - incoming request.
+ * @param res - the response to own.
+ */
+function stopHandler(req, res) {
+  if (req.method !== 'POST') {
+    res.writeHead(405, { allow: 'POST' })
+    res.end()
+    return
+  }
+  if (!sameOriginLoopback(req)) {
+    sendJson(res, 403, { ok: false, error: 'stop is limited to same-origin loopback requests' })
+    return
+  }
+  sendJson(res, 202, { ok: true, boot: BOOT_ID, pid: process.pid })
+  stopProcess()
+}
+
+/**
  * Mount the two routes once a Web host server exists. Profiles without a Web
  * host simply never take the injection, so the plugin loads everywhere.
  * @param ctx - Cordis context of this plugin's fiber.
@@ -285,5 +322,10 @@ export function apply(ctx) {
       path: '/dsh-restart/restart',
       handler: restartHandler,
     }), 'dsh-restart: restart route')
+    webCtx.effect(() => webCtx.webServer.register({
+      kind: 'exact',
+      path: '/dsh-restart/stop',
+      handler: stopHandler,
+    }), 'dsh-restart: stop route')
   })
 }

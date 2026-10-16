@@ -56,7 +56,14 @@ window.__ModuleLoader__.load({
 			restartFailed: "重启失败:{message}",
 			statusFailed: "无法读取宿主状态:{message}",
 			timeout: "等待新宿主就绪超时(60s)。请在启动 dsh 的终端里确认它是否已经退出。",
-			unknown: "未知"
+			unknown: "未知",
+			stopTitle: "停止 DeepSeek Harness 宿主",
+			stopDesc: "停止只结束当前宿主进程,不会拉起新的。会话记录已保存在磁盘上;要再跑起来,请回到启动 dsh 的终端执行同一条启动命令(重启后新宿主不在那个终端里,它由脱离终端的 helper 拉起)。",
+			stopNow: "停止宿主",
+			stopping: "正在停止…",
+			stopConfirm: "确认停止宿主?本页之后不会再自动回来。",
+			stopped: "宿主已停止。要重新启动,请回到终端执行启动命令。",
+			stopFailed: "停止失败:{message}"
 		};
 		const en = {
 			nav: "Restart",
@@ -72,7 +79,14 @@ window.__ModuleLoader__.load({
 			restartFailed: "Restart failed: {message}",
 			statusFailed: "Could not read host status: {message}",
 			timeout: "Timed out after 60s waiting for the new host. Check the terminal that launched dsh whether it exited.",
-			unknown: "unknown"
+			unknown: "unknown",
+			stopTitle: "Stop the DeepSeek Harness host",
+			stopDesc: "Stopping ends the current host process without starting a new one. Sessions are already on disk; to run again, go back to the terminal that launched dsh and run the same command (after a restart the host is no longer in that terminal — a detached helper started it).",
+			stopNow: "Stop the host",
+			stopping: "Stopping…",
+			stopConfirm: "Stop the host? This page will not come back on its own.",
+			stopped: "The host has stopped. To start it again, run the launch command in your terminal.",
+			stopFailed: "Could not stop: {message}"
 		};
 		//#endregion
 
@@ -115,6 +129,7 @@ window.__ModuleLoader__.load({
 			const [info, setInfo] = React.useState(null);
 			const [statusError, setStatusError] = React.useState(null);
 			const [phase, setPhase] = React.useState("idle");
+			const [action, setAction] = React.useState("restart");
 			const [error, setError] = React.useState(null);
 			const [elapsed, setElapsed] = React.useState(0);
 			const [tick, setTick] = React.useState(0);
@@ -171,6 +186,33 @@ window.__ModuleLoader__.load({
 				setError(t("timeout"));
 			}, [info, t]);
 
+			// A stop has no replacement to wait for: this process stops answering, and that
+			// silence is the success signal. The confirm step is the page's own, because a
+			// stop is the one action here that cannot be undone from the browser.
+			const doStop = React.useCallback(async () => {
+				if (typeof window.confirm === "function" && !window.confirm(t("stopConfirm"))) return;
+				setPhase("stopping");
+				setError(null);
+				try {
+					const response = await fetch("/dsh-restart/stop", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: "{}"
+					});
+					if (!response.ok) throw new Error("HTTP " + String(response.status));
+				} catch (cause) {
+					setPhase("failed");
+					setError(cause && cause.message ? cause.message : String(cause));
+					return;
+				}
+				const deadline = Date.now() + 20000;
+				while (Date.now() < deadline) {
+					await sleep(500);
+					if (await readStatus() === null) break;
+				}
+				setPhase("stopped");
+			}, [t]);
+
 			const rows = [
 				[t("pid"), info === null ? "—" : String(info.pid)],
 				[t("port"), info === null || info.port === null || info.port === undefined ? "—" : String(info.port)],
@@ -183,13 +225,21 @@ window.__ModuleLoader__.load({
 				stateText = React.createElement("span", { className: "dshr_state dshr_state_busy" },
 					React.createElement("span", { className: "dshr_spinner" }),
 					t("waiting", { seconds: elapsed }));
+			} else if (phase === "stopping") {
+				stateText = React.createElement("span", { className: "dshr_state dshr_state_busy" },
+					React.createElement("span", { className: "dshr_spinner" }),
+					t("stopping"));
+			} else if (phase === "stopped") {
+				stateText = React.createElement("span", { className: "dshr_state" }, t("stopped"));
 			} else if (phase === "failed") {
 				stateText = React.createElement("span", { className: "dshr_state dshr_state_error" },
-					t("restartFailed", { message: error === null ? t("unknown") : error }));
+					t(action === "stop" ? "stopFailed" : "restartFailed", { message: error === null ? t("unknown") : error }));
 			} else if (statusError !== null) {
 				stateText = React.createElement("span", { className: "dshr_state" },
 					t("statusFailed", { message: statusError }));
 			}
+
+			const busy = phase === "restarting" || phase === "stopping";
 
 			return React.createElement("div", { className: "dshr_root" },
 				React.createElement("div", { className: "dshr_card" },
@@ -204,10 +254,20 @@ window.__ModuleLoader__.load({
 						React.createElement(primitives.Button, {
 							variant: "primary",
 							size: "sm",
-							disabled: phase === "restarting",
-							onClick: () => { void doRestart(); }
+							disabled: busy,
+							onClick: () => { setAction("restart"); void doRestart(); }
 						}, phase === "restarting" ? t("restarting") : t("now")),
-						stateText)));
+						stateText)),
+				React.createElement("div", { className: "dshr_card" },
+					React.createElement("div", { className: "dshr_title" }, t("stopTitle")),
+					React.createElement("div", { className: "dshr_desc" }, t("stopDesc")),
+					React.createElement("div", { className: "dshr_actions" },
+						React.createElement(primitives.Button, {
+							variant: "danger",
+							size: "sm",
+							disabled: busy || phase === "stopped",
+							onClick: () => { setAction("stop"); void doStop(); }
+						}, phase === "stopping" ? t("stopping") : t("stopNow")))));
 		}
 
 		//#region plugin
