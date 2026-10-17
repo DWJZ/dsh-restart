@@ -127,6 +127,38 @@ window.__ModuleLoader__.load({
 		}
 
 		/**
+		 * Restart the host and reload this page once the replacement answers.
+		 *
+		 * The card does this with its own progress state; the shortcut has no card, so it shares
+		 * the same wait: without it a shortcut restart leaves the page pointing at a socket that
+		 * no longer exists.
+		 * @returns whether the page is about to reload.
+		 */
+		async function restartAndReload() {
+			const before = await readStatus();
+			try {
+				const response = await fetch("/dsh-restart/restart", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: "{}"
+				});
+				if (!response.ok) return false;
+			} catch {
+				return false;
+			}
+			const deadline = Date.now() + 60000;
+			while (Date.now() < deadline) {
+				await sleep(1000);
+				const status = await readStatus();
+				if (status !== null && (before === null || status.boot !== before.boot)) {
+					window.location.reload();
+					return true;
+				}
+			}
+			return false;
+		}
+
+		/**
 		 * 设置面板里的「重启」页。
 		 * @param props.t - 由 `locale: NS` 注入的翻译函数。
 		 */
@@ -312,13 +344,8 @@ window.__ModuleLoader__.load({
 						modals: [],
 						resolve: () => ({
 							status: "handled",
-							run: () => {
-								void fetch("/dsh-restart/restart", {
-									method: "POST",
-									headers: { "content-type": "application/json" },
-									body: "{}"
-								});
-							}
+							// Same wait as the card: reload as soon as a different boot id answers.
+							run: () => { void restartAndReload(); }
 						})
 					});
 				} catch (failure) {
