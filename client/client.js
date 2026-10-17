@@ -285,7 +285,9 @@ window.__ModuleLoader__.load({
 		function apply(ctx) {
 			ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-restart: dictionaries");
 			const t = ctx.locale.bind(NS);
-			// 重启快捷键:⌘⌥R(macOS)/ Ctrl+Alt+R(Windows)。
+			// 重启快捷键:⌘⇧K(macOS)/ Ctrl+Shift+K(Windows)。
+			// 不用 ⌘⌥R:Chrome 在 macOS 上占了它。这个组合在 Chrome 与 Electron 默认菜单里都没人用,
+			// 而且在设置的「快捷键」页可以自行改绑。
 			// web 运行时对组合键有白名单(binding.ts:isWebBindingAllowed),它只放行
 			// 「windows/macos 上的 primary+alt」和三个固定组合;web:linux 落在名单外,所以这里
 			// 不提供 linux 的默认值——那条路上不绑定,而不是让注册抛错。
@@ -296,11 +298,11 @@ window.__ModuleLoader__.load({
 						id: "dsh-restart.restart",
 						label: () => t("shortcutRestart"),
 						defaults: {
-							"desktop:macos": { code: "KeyR", modifiers: ["primary", "alt"] },
-							"desktop:windows": { code: "KeyR", modifiers: ["primary", "alt"] },
-							"desktop:linux": { code: "KeyR", modifiers: ["primary", "alt"] },
-							"web:macos": { code: "KeyR", modifiers: ["primary", "alt"] },
-							"web:windows": { code: "KeyR", modifiers: ["primary", "alt"] }
+							"desktop:macos": { code: "KeyK", modifiers: ["primary", "shift"] },
+							"desktop:windows": { code: "KeyK", modifiers: ["primary", "shift"] },
+							"desktop:linux": { code: "KeyK", modifiers: ["primary", "shift"] },
+							"web:macos": { code: "KeyK", modifiers: ["primary", "shift"] },
+							"web:windows": { code: "KeyK", modifiers: ["primary", "shift"] }
 						},
 						// 输入框里不接管:正在写提示词时误触会让页面重连。
 						regions: ["page"],

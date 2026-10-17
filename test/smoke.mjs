@@ -101,7 +101,7 @@ check('client registers the restart shortcut',
   shortcutCommands.length === 1 && shortcutCommands[0].id === 'dsh-restart.restart')
 const keys = shortcutCommands[0]?.defaults ?? {}
 check('every declared surface maps it to the same chord',
-  Object.values(keys).every(k => k.code === 'KeyR' && String(k.modifiers) === 'primary,alt'),
+  Object.values(keys).every(k => k.code === 'KeyK' && String(k.modifiers) === 'primary,shift'),
   JSON.stringify(keys))
 check('and web:linux is left unbound, because the shell rejects that chord there',
   keys['web:linux'] === undefined, JSON.stringify(Object.keys(keys)))
