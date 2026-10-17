@@ -65,7 +65,6 @@ window.__ModuleLoader__.load({
 			stopNow: "停止宿主",
 			stopping: "正在停止…",
 			stopConfirm: "确认停止宿主?本页之后不会再自动回来。",
-			shortcutRestart: "重启宿主",
 			stopped: "宿主已停止。要重新启动,请回到终端执行启动命令。",
 			stopFailed: "停止失败:{message}"
 		};
@@ -89,7 +88,6 @@ window.__ModuleLoader__.load({
 			stopNow: "Stop the host",
 			stopping: "Stopping…",
 			stopConfirm: "Stop the host? This page will not come back on its own.",
-			shortcutRestart: "Restart host",
 			stopped: "The host has stopped. To start it again, run the launch command in your terminal.",
 			stopFailed: "Could not stop: {message}"
 		};
@@ -279,39 +277,12 @@ window.__ModuleLoader__.load({
 		}
 
 		//#region plugin
-		const inject = ["slots", "locale", "shortcuts"];
+		const inject = ["slots", "locale"];
 
 		/** 注册设置页与字典。 */
 		function apply(ctx) {
 			ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-restart: dictionaries");
 			const t = ctx.locale.bind(NS);
-			// 重启快捷键。选 ⌘⌥R / Ctrl+Alt+R:浏览器和 Electron 菜单都没占它,宿主里也已经有人
-			// 用了 ⌘R / ⌘⇧R / ⌘B / ⌘J / ⌘T / ⌘, 这些,这里刻意避开。
-			ctx.effect(() => ctx.shortcuts.register({
-				id: "dsh-restart.restart",
-				label: () => t("shortcutRestart"),
-				defaults: {
-					"web:macos": { code: "KeyR", modifiers: ["primary", "alt"] },
-					"web:windows": { code: "KeyR", modifiers: ["primary", "alt"] },
-					"web:linux": { code: "KeyR", modifiers: ["primary", "alt"] },
-					"desktop:macos": { code: "KeyR", modifiers: ["primary", "alt"] },
-					"desktop:windows": { code: "KeyR", modifiers: ["primary", "alt"] },
-					"desktop:linux": { code: "KeyR", modifiers: ["primary", "alt"] }
-				},
-				// 输入框里不接管:正在写提示词时误触会让页面重连。
-				regions: ["page"],
-				modals: [],
-				resolve: () => ({
-					status: "handled",
-					run: () => {
-						void fetch("/dsh-restart/restart", {
-							method: "POST",
-							headers: { "content-type": "application/json" },
-							body: "{}"
-						});
-					}
-				})
-			}), "dsh-restart: restart shortcut");
 			// 设置外壳声明 settings.section 之后再挂载本页,顺序不受约束。
 			ctx.slots.inject("settings.section", () => {
 				const dispose = ctx.slots.register({
