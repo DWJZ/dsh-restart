@@ -1,7 +1,7 @@
 {
   "name": "dsh-restart",
   "version": "0.1.0",
-  "description": "DeepSeek Harness 重启按钮插件:在设置的「重启」页一键重启 dsh Web 宿主进程。 / One-click host restart from a page in Settings.",
+  "description": "DeepSeek Harness \u91cd\u542f\u6309\u94ae\u63d2\u4ef6:\u5728\u8bbe\u7f6e\u7684\u300c\u91cd\u542f\u300d\u9875\u4e00\u952e\u91cd\u542f dsh Web \u5bbf\u4e3b\u8fdb\u7a0b\u3002 / One-click host restart from a page in Settings.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -17,7 +17,7 @@
   ],
   "main": "src/index.js",
   "scripts": {
-    "test": "node test/smoke.mjs"
+    "test": "node test/smoke.mjs && node test/shortcut-conflicts.spec.mjs"
   },
   "exports": {
     ".": "./src/index.js",
