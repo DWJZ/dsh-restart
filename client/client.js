@@ -297,6 +297,9 @@ window.__ModuleLoader__.load({
 					return ctx.shortcuts.register({
 						id: "dsh-restart.restart",
 						label: () => t("shortcutRestart"),
+						// 快捷键面板会把 aliases 直接展开（Reference.tsx: names: [...row.aliases]），
+						// 不给它就会在渲染时抛错——整个面板点不开。宿主的每条命令都带着它。
+						aliases: ["restart", "restart host", "reboot", "重启", "重启宿主"],
 						defaults: {
 							"desktop:macos": { code: "KeyK", modifiers: ["primary", "shift"] },
 							"desktop:windows": { code: "KeyK", modifiers: ["primary", "shift"] },
