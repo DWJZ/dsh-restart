@@ -27,6 +27,9 @@ window.__ModuleLoader__.load({
 				".dshr_title{font-weight:600;font-size:14px}",
 				".dshr_desc{color:var(--dsw-alias-label-secondary);white-space:pre-wrap}",
 				".dshr_grid{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:12px;font-variant-numeric:tabular-nums}",
+				".dshr_danger{color:var(--dsw-alias-state-error-primary);border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary) 55%,transparent)}",
+				".dshr_danger:hover:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 12%,transparent);border-color:var(--dsw-alias-state-error-primary)}",
+				".dshr_danger:disabled{opacity:.5}",
 				".dshr_key{color:var(--dsw-alias-label-tertiary)}",
 				".dshr_val{color:var(--dsw-alias-label-secondary);word-break:break-all}",
 				".dshr_actions{display:flex;align-items:center;gap:12px}",
@@ -263,8 +266,11 @@ window.__ModuleLoader__.load({
 					React.createElement("div", { className: "dshr_desc" }, t("stopDesc")),
 					React.createElement("div", { className: "dshr_actions" },
 						React.createElement(primitives.Button, {
-							variant: "danger",
+							// The primitive's variants are primary/ghost/outline/toolbar; there is no
+							// `danger`, so the destructive colour comes from the error token instead.
+							variant: "outline",
 							size: "sm",
+							className: "dshr_danger",
 							disabled: busy || phase === "stopped",
 							onClick: () => { setAction("stop"); void doStop(); }
 						}, phase === "stopping" ? t("stopping") : t("stopNow")))));
