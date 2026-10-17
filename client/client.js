@@ -65,6 +65,7 @@ window.__ModuleLoader__.load({
 			stopNow: "停止宿主",
 			stopping: "正在停止…",
 			stopConfirm: "确认停止宿主?本页之后不会再自动回来。",
+			confirmRestart: "确认重启 DeepSeek Harness 宿主?",
 			stopped: "宿主已停止。要重新启动,请回到终端执行启动命令。",
 			stopFailed: "停止失败:{message}"
 		};
@@ -88,6 +89,7 @@ window.__ModuleLoader__.load({
 			stopNow: "Stop the host",
 			stopping: "Stopping…",
 			stopConfirm: "Stop the host? This page will not come back on its own.",
+			confirmRestart: "Restart the DeepSeek Harness host?",
 			stopped: "The host has stopped. To start it again, run the launch command in your terminal.",
 			stopFailed: "Could not stop: {message}"
 		};
@@ -283,6 +285,25 @@ window.__ModuleLoader__.load({
 		function apply(ctx) {
 			ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-restart: dictionaries");
 			const t = ctx.locale.bind(NS);
+			// 侧边栏账号菜单里那一行由宿主渲染:本插件在场时给 document 打标记,并响应它发出的请求。
+			// 没有这个插件时宿主不显示那一行,也不会有人监听这个事件。
+			ctx.effect(() => {
+				if (typeof document === "undefined" || typeof window === "undefined") return () => {};
+				document.documentElement.dataset.dshRestart = "1";
+				const onRequest = () => {
+					if (!window.confirm?.(t("confirmRestart")) ) return;
+					void fetch("/dsh-restart/restart", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: "{}"
+					});
+				};
+				window.addEventListener("dsh-restart:request", onRequest);
+				return () => {
+					window.removeEventListener("dsh-restart:request", onRequest);
+					delete document.documentElement.dataset.dshRestart;
+				};
+			}, "dsh-restart: menu entry");
 			// 设置外壳声明 settings.section 之后再挂载本页,顺序不受约束。
 			ctx.slots.inject("settings.section", () => {
 				const dispose = ctx.slots.register({
