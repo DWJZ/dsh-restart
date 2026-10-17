@@ -65,6 +65,7 @@ window.__ModuleLoader__.load({
 			stopNow: "停止宿主",
 			stopping: "正在停止…",
 			stopConfirm: "确认停止宿主?本页之后不会再自动回来。",
+			shortcutRestart: "重启宿主",
 			stopped: "宿主已停止。要重新启动,请回到终端执行启动命令。",
 			stopFailed: "停止失败:{message}"
 		};
@@ -88,6 +89,7 @@ window.__ModuleLoader__.load({
 			stopNow: "Stop the host",
 			stopping: "Stopping…",
 			stopConfirm: "Stop the host? This page will not come back on its own.",
+			shortcutRestart: "Restart host",
 			stopped: "The host has stopped. To start it again, run the launch command in your terminal.",
 			stopFailed: "Could not stop: {message}"
 		};
@@ -277,12 +279,49 @@ window.__ModuleLoader__.load({
 		}
 
 		//#region plugin
-		const inject = ["slots", "locale"];
+		const inject = ["slots", "locale", "shortcuts"];
 
 		/** 注册设置页与字典。 */
 		function apply(ctx) {
 			ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-restart: dictionaries");
 			const t = ctx.locale.bind(NS);
+			// 重启快捷键:⌘⌥R(macOS)/ Ctrl+Alt+R(Windows)。
+			// web 运行时对组合键有白名单(binding.ts:isWebBindingAllowed),它只放行
+			// 「windows/macos 上的 primary+alt」和三个固定组合;web:linux 落在名单外,所以这里
+			// 不提供 linux 的默认值——那条路上不绑定,而不是让注册抛错。
+			// 注册失败不该拖垮整个插件:外壳的设置页仍然可用,只是没有快捷键。
+			ctx.effect(() => {
+				try {
+					return ctx.shortcuts.register({
+						id: "dsh-restart.restart",
+						label: () => t("shortcutRestart"),
+						defaults: {
+							"desktop:macos": { code: "KeyR", modifiers: ["primary", "alt"] },
+							"desktop:windows": { code: "KeyR", modifiers: ["primary", "alt"] },
+							"desktop:linux": { code: "KeyR", modifiers: ["primary", "alt"] },
+							"web:macos": { code: "KeyR", modifiers: ["primary", "alt"] },
+							"web:windows": { code: "KeyR", modifiers: ["primary", "alt"] }
+						},
+						// 输入框里不接管:正在写提示词时误触会让页面重连。
+						regions: ["page"],
+						modals: [],
+						resolve: () => ({
+							status: "handled",
+							run: () => {
+								void fetch("/dsh-restart/restart", {
+									method: "POST",
+									headers: { "content-type": "application/json" },
+									body: "{}"
+								});
+							}
+						})
+					});
+				} catch (failure) {
+					// The shell refuses a default it cannot honour; keep the page, drop the key.
+					console.warn("dsh-restart: shortcut registration skipped:", String(failure?.message ?? failure));
+					return () => {};
+				}
+			}, "dsh-restart: restart shortcut");
 			// 设置外壳声明 settings.section 之后再挂载本页,顺序不受约束。
 			ctx.slots.inject("settings.section", () => {
 				const dispose = ctx.slots.register({
