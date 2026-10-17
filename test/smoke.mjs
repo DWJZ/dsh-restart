@@ -89,12 +89,22 @@ check('client factory exports apply', typeof client.apply === 'function')
 check('client factory exports inject', Array.isArray(client.inject) && client.inject.includes('slots'))
 
 let registration = null
+const shortcutCommands = []
 const ctx = {
   effect: (factory) => factory(),
   locale: { register: () => () => {}, bind: () => (key) => key },
   slots: { inject: (_name, factory) => factory(), register: (options, component) => { registration = { options, component }; return () => {} } },
+  shortcuts: { register: (command) => { shortcutCommands.push(command); return () => {} } },
 }
 client.apply(ctx)
+check('client registers the restart shortcut',
+  shortcutCommands.length === 1 && shortcutCommands[0].id === 'dsh-restart.restart')
+const keys = shortcutCommands[0]?.defaults ?? {}
+check('every surface maps it to the same chord',
+  Object.values(keys).every(k => k.code === 'KeyR' && String(k.modifiers) === 'primary,alt'),
+  JSON.stringify(keys))
+check('and it stays out of the composer',
+  String(shortcutCommands[0]?.regions) === 'page', String(shortcutCommands[0]?.regions))
 check('client registers a settings section', registration !== null && registration.options.name === 'settings.section')
 check('client registers a nav label thunk', typeof registration.options.label === 'function' && registration.options.label() === 'nav')
 if (found === null) {
