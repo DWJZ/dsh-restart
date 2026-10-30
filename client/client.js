@@ -339,8 +339,8 @@ window.__ModuleLoader__.load({
 							"web:macos": { code: "KeyK", modifiers: ["primary", "shift"] },
 							"web:windows": { code: "KeyK", modifiers: ["primary", "shift"] }
 						},
-						// 输入框里不接管:正在写提示词时误触会让页面重连。
-						regions: ["page"],
+						// 页面和输入框等可编辑区域都接管(桌面端本来就不受区域限制);终端(xterm)仍留给终端输入。
+						regions: ["page", "editable"],
 						modals: [],
 						resolve: () => ({
 							status: "handled",

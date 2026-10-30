@@ -108,8 +108,8 @@ check('and web:linux is left unbound, because the shell rejects that chord there
 check('the command carries search aliases, which the reference panel spreads',
   Array.isArray(shortcutCommands[0]?.aliases) && shortcutCommands[0].aliases.length > 0,
   JSON.stringify(shortcutCommands[0]?.aliases))
-check('the shortcut stays out of the composer',
-  String(shortcutCommands[0]?.regions) === 'page', String(shortcutCommands[0]?.regions))
+check('the shortcut also fires from editable surfaces such as the composer',
+  String(shortcutCommands[0]?.regions) === 'page,editable', String(shortcutCommands[0]?.regions))
 check('client registers a settings section', registration !== null && registration.options.name === 'settings.section')
 check('client registers a nav label thunk', typeof registration.options.label === 'function' && registration.options.label() === 'nav')
 if (found === null) {
