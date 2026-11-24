@@ -14,9 +14,9 @@
  * replacement never dies of EADDRINUSE while the old socket is still held.
  */
 import { spawn } from 'node:child_process'
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { delimiter, dirname, join, resolve } from 'node:path'
 
 /** Stable Cordis plugin name. */
 export const name = 'dsh-restart'
@@ -98,6 +98,38 @@ export function servingPort(req) {
 }
 
 /**
+ * The Node binary the helper and its replacement should run.
+ *
+ * A package-manager upgrade can delete the binary this host was started from
+ * while the process keeps serving, and replaying `process.execPath` then fails
+ * to spawn both the helper and the replacement. The `node` found on PATH is the
+ * binary a fresh terminal launch would use, so it is the fallback.
+ * @param options - injectable collaborators for tests.
+ * @param options.execPath - the binary this process runs from, defaulting to this process's.
+ * @param options.pathEnv - the PATH searched when `execPath` is gone, defaulting to this process's.
+ * @param options.platform - platform deciding the executable name, defaulting to this host's.
+ * @param options.exists - file-existence predicate, defaulting to the filesystem.
+ * @returns an absolute binary path when one exists, otherwise `node` for the spawn PATH lookup.
+ */
+export function nodeExecutable({
+  execPath = process.execPath,
+  pathEnv = process.env.PATH,
+  platform = process.platform,
+  exists = existsSync,
+} = {}) {
+  if (exists(execPath)) return execPath
+  const names = platform === 'win32' ? ['node.exe', 'node'] : ['node']
+  for (const dir of (pathEnv ?? '').split(delimiter)) {
+    if (dir === '') continue
+    for (const name of names) {
+      const candidate = join(dir, name)
+      if (exists(candidate)) return candidate
+    }
+  }
+  return 'node'
+}
+
+/**
  * This process's own launch invocation, in the shape the detached helper
  * replays. A `bin.js`/`bin.ts`/`dsh` entry is relaunched through the running
  * Node binary with the same exec arguments and absolute entry, because a
@@ -106,18 +138,20 @@ export function servingPort(req) {
  * @param argv - launch arguments, defaulting to this process's.
  * @param execArgv - Node exec arguments, defaulting to this process's.
  * @param platform - platform deciding the shell fallback, defaulting to this host's.
+ * @param nodeBin - Node binary to replay, defaulting to this process's when it still exists.
  * @returns the file, arguments, working directory, and shell requirement.
  */
 export function hostLaunch({
   argv = process.argv,
   execArgv = process.execArgv,
   platform = process.platform,
+  nodeBin = nodeExecutable(),
 } = {}) {
   const entry = argv[1]
   if (typeof entry === 'string' && /[\\/](?:bin\.(?:js|ts)|dsh)$/u.test(entry)) {
     const absoluteEntry = resolve(entry)
     return {
-      file: process.execPath,
+      file: nodeBin,
       args: [...execArgv, absoluteEntry, ...argv.slice(2)],
       cwd: dirname(absoluteEntry),
       viaShell: false,
@@ -213,17 +247,29 @@ export function stopProcess({ kill = process.kill, timer = setTimeout } = {}) {
  * @returns the scheduling facts written to the route answer and the log.
  */
 function scheduleRestart(port) {
-  const launch = hostLaunch()
+  const nodeBin = nodeExecutable()
+  const launch = hostLaunch({ nodeBin })
   const stamp = new Date().toISOString().replace(/[:.]/gu, '-').slice(0, 19)
   const logOut = join(tmpdir(), `dsh-restart-${stamp}.out.log`)
   const logErr = join(tmpdir(), `dsh-restart-${stamp}.err.log`)
-  const helper = spawn(process.execPath, ['-e', helperSource(launch, logOut, logErr, port)], {
+  const helper = spawn(nodeBin, ['-e', helperSource(launch, logOut, logErr, port)], {
     detached: true,
     stdio: 'ignore',
   })
+  helper.on('error', (error) => {
+    try {
+      appendFileSync(logErr, `[dsh-restart] could not start the helper: ${error instanceof Error ? error.message : String(error)}\n`)
+    }
+    catch {
+      // The helper is already lost; a failed note must not throw out of the error event.
+    }
+  })
   helper.unref()
   try {
-    appendFileSync(logErr, `[dsh-restart] scheduled pid=${String(process.pid)} helper=${String(helper.pid)} port=${String(port)}\n`)
+    const fallback = nodeBin === process.execPath
+      ? ''
+      : `[dsh-restart] ${process.execPath} is gone; using ${nodeBin}\n`
+    appendFileSync(logErr, `${fallback}[dsh-restart] scheduled pid=${String(process.pid)} helper=${String(helper.pid)} port=${String(port)}\n`)
   }
   catch {
     // A missing log file only costs the postmortem; the restart itself proceeds.

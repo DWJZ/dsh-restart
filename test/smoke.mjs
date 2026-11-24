@@ -39,10 +39,43 @@ check('hostLaunch runs from the entry directory', launch.cwd === resolve('apps/c
 check('hostLaunch needs no shell', launch.viaShell === false)
 check('hostLaunch falls back to the dsh shim',
   host.hostLaunch({ argv: ['/opt/node/bin/node', '/usr/local/bin/other'], execArgv: [], platform: 'darwin' }).file === 'dsh')
+check('nodeExecutable keeps a binary that still exists',
+  host.nodeExecutable({
+    execPath: '/opt/node/bin/node',
+    pathEnv: '/usr/bin',
+    exists: (path) => path === '/opt/node/bin/node',
+  }) === '/opt/node/bin/node')
+check('nodeExecutable falls back to the node on PATH when the running binary is gone',
+  host.nodeExecutable({
+    execPath: '/opt/node/bin/node',
+    pathEnv: '/usr/bin:/usr/local/bin',
+    exists: (path) => path === '/usr/local/bin/node',
+  }) === '/usr/local/bin/node')
+check('nodeExecutable asks for the bare name when PATH has no node either',
+  host.nodeExecutable({ execPath: '/opt/node/bin/node', pathEnv: '', exists: () => false }) === 'node')
+check('nodeExecutable looks for node.exe on Windows',
+  host.nodeExecutable({
+    execPath: 'C:\\gone\\node.exe',
+    pathEnv: '/usr/bin',
+    platform: 'win32',
+    exists: (path) => path === '/usr/bin/node.exe',
+  }) === '/usr/bin/node.exe')
+check('hostLaunch replays the resolved node binary',
+  host.hostLaunch({
+    argv: ['/opt/node/bin/node', 'apps/cli/src/bin.ts', 'web'],
+    execArgv: [],
+    platform: 'darwin',
+    nodeBin: '/usr/local/bin/node',
+  }).file === '/usr/local/bin/node')
 
 const probe = join(tmpdir(), `dsh-restart-smoke-${String(process.pid)}.txt`)
 const logOut = join(tmpdir(), 'dsh-restart-smoke.out.log')
 const logErr = join(tmpdir(), 'dsh-restart-smoke.err.log')
+check('the helper replays the resolved binary',
+  host.helperSource(
+    { file: '/usr/local/bin/node', args: [], cwd: undefined, viaShell: false },
+    logOut, logErr, 45999,
+  ).includes('"/usr/local/bin/node"'))
 rmSync(probe, { force: true })
 rmSync(logOut, { force: true })
 const { spawn } = await import('node:child_process')

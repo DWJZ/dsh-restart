@@ -19,7 +19,7 @@ A **Restart** page in the DeepSeek Harness (dsh) Web settings panel: one button 
 - **Browser half** registers a `settings.section` page showing that identity, a restart button, and a stop button.
 - **Shortcut** — <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> (macOS) or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> (Windows) restarts the host without opening settings. Rebind it on the settings *Keyboard* page like any other command. It fires from the page and from editable surfaces such as the composer, while terminal input keeps it out, and it appears with its label on the settings *Keyboard* page. Web on Linux is left unbound: the client's shortcut allowlist rejects every `primary+alt` chord there, so registering one would fail the plugin's activation. After a restart it polls `/dsh-restart/status` and reloads the page as soon as a different boot id answers; after a stop there is nothing to wait for, so the page reports success once the status route stops answering — and says plainly that starting again means running the launch command in a terminal.
 
-The restart itself is done by a detached helper: the host exits after 400 ms, and the helper waits until the port stops accepting connections before spawning the replacement with **exactly the same launch invocation** (Node binary, `execArgv`, absolute entry path, remaining argv, working directory). That ordering is what keeps the replacement from dying of `EADDRINUSE` while the old socket is still held. Logs land in the system temp directory as `dsh-restart-<timestamp>.out.log` / `.err.log`.
+The restart itself is done by a detached helper: the host exits after 400 ms, and the helper waits until the port stops accepting connections before spawning the replacement with **exactly the same launch invocation** (Node binary, `execArgv`, absolute entry path, remaining argv, working directory). That ordering is what keeps the replacement from dying of `EADDRINUSE` while the old socket is still held. When the Node binary the host was started from no longer exists — a package-manager upgrade removes it while the host keeps running — the helper and the replacement fall back to the `node` found on PATH, and the error log records the substitution. Logs land in the system temp directory as `dsh-restart-<timestamp>.out.log` / `.err.log`.
 
 A stop is the same 400 ms `SIGTERM` with no helper behind it, which is what lets the CLI flush sessions and dispose plugins before its own escalation timer forces the exit. Because a stopped host has no replacement, the process you restart from the page is also the one no longer attached to your terminal — after any restart, stopping it means this button, `kill <pid>`, or `curl -X POST http://127.0.0.1:<port>/dsh-restart/stop`.
 
@@ -49,7 +49,7 @@ The first install needs one restart before the page exists — restart the host 
 node test/smoke.mjs
 ```
 
-Covers: the detached helper really starts a replacement process, all four refusal paths of the same-origin guard, and the client bundle's registration and render. Set `DSH_CHECKOUT=<dsh checkout>` to add an SSR render assertion using that checkout's React; without it that one assertion is skipped.
+Covers: the detached helper really starts a replacement process, the PATH fallback when the running Node binary is gone, all four refusal paths of the same-origin guard, and the client bundle's registration and render. Set `DSH_CHECKOUT=<dsh checkout>` to add an SSR render assertion using that checkout's React; without it that one assertion is skipped.
 
 ## License
 

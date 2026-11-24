@@ -19,7 +19,7 @@ description: "dsh-restart: 在 dsh Web 设置面板里一键重启宿主进程�
 - **浏览器半**注册一个 `settings.section` 页面:显示上述信息,并给出重启与停止两个按钮。重启后它轮询 `/dsh-restart/status`,一旦应答的 boot id 变了就刷新页面;停止之后没有可等的东西,所以页面以「status 不再应答」作为成功信号,并明确告诉你:想再跑起来要回终端执行启动命令。
 - **快捷键** —— `Cmd+Shift+K`（macOS）或 `Ctrl+Shift+K`（Windows）不打开设置就能重启宿主，可在设置的「快捷键」页改绑。它在页面以及输入框等可编辑区域有焦点时都触发（终端输入区除外）；标签与其它命令一样列在设置的「快捷键」页里。web 上的 Linux 不绑定：客户端的组合键白名单会拒绝所有 `primary+alt` 组合，注册它会让插件激活失败。
 
-重启由 detached helper 完成:宿主在 400ms 后退出,helper 等到端口不再接受连接,才用**完全相同的启动命令**拉起替代进程(Node 可执行文件、`execArgv`、入口绝对路径、其余 argv、工作目录)。这个顺序保证了替代进程不会在旧 socket 还占着端口时死于 `EADDRINUSE`。日志写在系统临时目录的 `dsh-restart-<时间戳>.out.log` / `.err.log`。
+重启由 detached helper 完成:宿主在 400ms 后退出,helper 等到端口不再接受连接,才用**完全相同的启动命令**拉起替代进程(Node 可执行文件、`execArgv`、入口绝对路径、其余 argv、工作目录)。这个顺序保证了替代进程不会在旧 socket 还占着端口时死于 `EADDRINUSE`。宿主启动时用的那个 Node 二进制如果已经不存在了(例如包管理器在宿主运行期间升级并移除旧版本),helper 与替代进程会改用 PATH 上的 `node`,并在错误日志里记下这次替换。日志写在系统临时目录的 `dsh-restart-<时间戳>.out.log` / `.err.log`。
 
 停止是同一个 400ms 的 `SIGTERM`,只是后面没有 helper——这正是 CLI 能在它自己的超时强退之前先落盘会话、dispose 插件的原因。因为没有替代进程,从页面重启出来的那个进程同时也就不再挂在你的终端上:此后要停它,就是这个按钮、`kill <pid>`,或 `curl -X POST http://127.0.0.1:<端口>/dsh-restart/stop`。
 
@@ -51,7 +51,7 @@ dsh plugin --profile web add link:/path/to/dsh-restart
 node test/smoke.mjs
 ```
 
-覆盖:detached helper 真的能拉起替代进程、同源校验的四种拒绝路径、客户端 bundle 的注册与渲染。设置 `DSH_CHECKOUT=<dsh 检出目录>` 时额外用该检出里的 React 做一次 SSR 渲染断言;不设置则跳过该条。
+覆盖:detached helper 真的能拉起替代进程、运行中的 Node 二进制消失时回退到 PATH 上的 node、同源校验的四种拒绝路径、客户端 bundle 的注册与渲染。设置 `DSH_CHECKOUT=<dsh 检出目录>` 时额外用该检出里的 React 做一次 SSR 渲染断言;不设置则跳过该条。
 
 ## 许可证
 
